@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore")
 
 class Models:
 
-    def __init__(self):
+    def grid_training(self, X, y):
         
         # Dividir los datos en conjuntos de entrenamiento y prueba
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=123)
@@ -35,9 +35,11 @@ class Models:
 
         # lista de los pipelines
         pipelines = [pipeline_lr, pipeline_dt, pipeline_rf, pipeline_kn, pipeline_xgb]
+        #pipelines = [pipeline_lr, pipeline_dt]
 
         # Diccionario de pipelines y tipos de modelos
         pipe_dict = {0: "LinearRegression", 1: "DecisionTree", 2: "RandomForest",3: "KNeighbors", 4: "XGBoost"}
+        #pipe_dict = {0: "LinearRegression", 1: "DecisionTree"}
 
         # ajusto los pipelines
         for pipe in pipelines:
@@ -46,13 +48,20 @@ class Models:
         # Valores de RMSE para los diferentes modelos
         cv_results_rms = []
         for i, model in enumerate(pipelines):
-            cv_score = cross_val_score(model, X_train,y_train,scoring="neg_root_mean_squared_error", cv=10)
+            cv_score = cross_val_score(model, X_train,y_train,scoring="neg_root_mean_squared_error", cv=3)
             cv_results_rms.append(cv_score)
             print("%s: %f " % (pipe_dict[i], cv_score.mean()))
 
-        # Elijo el mejor modelo basado en el que tenga menor neg_root_mean_squared_error
-        best_model = pipelines[np.argmax(cv_results_rms)]
-        best_score = cv_results_rms[np.argmax(cv_results_rms)].mean()
+        # guardo cada resultado en un dataframe
+        df = pd.DataFrame(cv_results_rms, index=pipe_dict.values())
+
+        # calculo media en df
+        df['mean'] = df.mean(axis=1)
+
+        # obtengo el mejor modelo con base a la posicion del mayor valor de mean
+        best_model = pipelines[np.argmax(df['mean'])]
+        print("="*60)
+        print("Mejor modelo:", pipe_dict[np.argmax(df['mean'])])
 
         # Predicción del conjunto de prueba
         pred = best_model.predict(X_test)
@@ -63,8 +72,9 @@ class Models:
         print("MAE:",metrics.mean_absolute_error(y_test, pred))
         print("MSE:",metrics.mean_squared_error(y_test, pred))
         print("RMSE:",np.sqrt(metrics.mean_squared_error(y_test, pred)))
+
+        best_score = metrics.r2_score(y_test, pred)
         
         # Exporto el mejor modelo
         utils = Utils()
         utils.model_export(best_model, best_score)
-        print(f'el mejor modelo es {pipe_dict[np.argmax(cv_results_rms)]} con un score de {best_score}')
